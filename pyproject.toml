@@ -1,0 +1,39 @@
+[project]
+name = "sample_dtypes"
+version = "0.0.0"   # Keep in sync with sample_dtypes/__init__.py:__version__
+description = "Experimental NumPy dtype implementation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    'Topic :: Software Development',
+]
+keywords = []
+
+# pip dependencies of the project
+dependencies = [
+    "numpy",
+]
+
+[project.urls]
+repository = "https://github.com/trundev/numpy-sample_dtypes"
+
+[project.optional-dependencies]
+# Development deps (unittest, linting, formating,...)
+# Installed through `pip install .[dev]`
+dev = [
+    "pytest",
+    "pytest-xdist",
+]
+
+[build-system]
+requires = [
+    "numpy",
+    "setuptools",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["sample_dtypes"]

@@ -1,0 +1,18 @@
+# Compiled python modules.
+*.pyc
+*.so
+
+# Byte-compiled
+_pycache__/
+.cache/
+
+# setuptools, PyPI distribution artifacts.
+/*.egg-info/
+build/
+dist/
+
+# Tests
+.pytest_cache/
+
+# Type checking
+.pytype/

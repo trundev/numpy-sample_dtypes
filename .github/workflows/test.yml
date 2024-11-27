@@ -1,0 +1,59 @@
+name: Test
+
+on:
+  # Trigger the workflow on push or pull request
+  push:
+    branches: [main, '**-test']
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+      - uses: pre-commit/action@v3.0.0
+        id: pre-commit
+      # If `pre-commit` fails, its modifications are uploaded as an artifact
+      # Download it and use `git apply pre-commit.patch` to fix the code
+      - name: Keep `pre-commit` modifications
+        if: ${{ failure() && steps.pre-commit.conclusion == 'failure' }}
+        run: |
+          git diff --patch > pre-commit.patch
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() && steps.pre-commit.conclusion == 'failure' }}
+        with:
+          name: pre-commit-mods
+          path: pre-commit.patch
+
+  build:
+    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
+    #needs: lint
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.10", 3.11, 3.12, 3.13]
+        include:
+          - os: windows-latest
+            python-version: 3.12
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+      - name: Run tests
+        run: |
+          pytest -n auto

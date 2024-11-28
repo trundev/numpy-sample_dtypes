@@ -1,7 +1,5 @@
 // Must be included first
-// clang-format off
 #include "src/numpy.h"
-// clang-format on
 
 #include <iostream>
 #include <locale>

@@ -8,11 +8,11 @@ from setuptools.command.build_py import build_py
 
 if platform.system() == "Windows":
   COMPILE_ARGS = [
-      "/std:c++17",
+      "/std:c++20",
   ]
 else:
   COMPILE_ARGS = [
-      "-std=c++17",
+      "-std=c++20",
   ]
 
 

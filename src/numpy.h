@@ -5,6 +5,9 @@
 #error "Numpy cannot be included before numpy.h."
 #endif
 
+// Disallow Numpy 1.23 deprecated symbols (correspond to python 3.10).
+#define NPY_NO_DEPRECATED_API NPY_1_23_API_VERSION
+
 // We import_array in the sample_dtypes init function only.
 #define PY_ARRAY_UNIQUE_SYMBOL _sample_dtypes_numpy_api
 #ifndef SAMPLE_DTYPES_IMPORT_NUMPY

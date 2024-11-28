@@ -1,10 +1,9 @@
 // Must be included first
-// clang-format off
 #include "src/numpy.h"
-// clang-format on
 
 #include <iostream>
 #include <locale>
+#include <memory>
 
 // Place `<locale>` before <Python.h> to avoid a build failure in macOS.
 #include <Python.h>

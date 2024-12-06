@@ -10,8 +10,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     'Topic :: Software Development',
 ]
-keywords = []
-
 # pip dependencies of the project
 dependencies = [
     "numpy",
@@ -30,10 +28,9 @@ dev = [
 
 [build-system]
 requires = [
+    "meson",
+    "meson-python",
+    "wheel",
     "numpy",
-    "setuptools",
 ]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["sample_dtypes"]
+build-backend = "mesonpy"

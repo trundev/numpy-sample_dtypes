@@ -2,6 +2,7 @@
 
 
 def test_import():
+  """Test importing of root module"""
   import sample_dtypes
 
   print(
@@ -11,7 +12,8 @@ def test_import():
 
 
 def test_import_ext():
-  from sample_dtypes import _sample_dtypes_ext as pyd
+  """Test importing of the extension module"""
+  from sample_dtypes import _sample_dtypes_main as pyd
 
-  print(f'sample_dtypes._sample_dtypes_ext ({pyd.__name__}):')
+  print(f'sample_dtypes._sample_dtypes_main ({pyd.__name__}):')
   print('*', pyd.__file__)

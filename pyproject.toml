@@ -10,8 +10,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     'Topic :: Software Development',
 ]
-keywords = []
-
 # pip dependencies of the project
 dependencies = [
     "numpy",
@@ -30,10 +28,12 @@ dev = [
 
 [build-system]
 requires = [
+    "meson",
+    "meson-python",
+    "wheel",
     "numpy",
-    "setuptools",
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "mesonpy"
 
-[tool.setuptools]
-packages = ["sample_dtypes"]
+[tool.meson-python.args]
+setup = ["--vsenv"]     # Ensure MSVC is used on Windows (harmless on non-Windows)

@@ -16,18 +16,40 @@ PyTypeObject *SampleScalar_Type = NULL;
  * Internal helper to create new instances
  */
 SampleDTypeObject *new_sampledtype_instance(PyObject *sample_scalar) {
+  printf("%s\n", __func__);
+
+  // Take element size and alignment from SampleScalar object
+  PyObject *attr = PyObject_GetAttrString(sample_scalar, "elsize");
+  if (attr == NULL) {
+    return NULL;
+  }
+  int elsize = PyLong_AsLong(attr);
+  Py_DECREF(attr);
+  if (elsize == -1 && PyErr_Occurred()) {
+    return NULL;
+  }
+
+  attr = PyObject_GetAttrString(sample_scalar, "alignment");
+  if (attr == NULL) {
+    return NULL;
+  }
+  int alignment = PyLong_AsLong(attr);
+  Py_DECREF(attr);
+  if (alignment == -1 && PyErr_Occurred()) {
+    return NULL;
+  }
+
+  // Allocate final DType bject
   SampleDTypeObject *new = (SampleDTypeObject *)PyArrayDescr_Type.tp_new(
       (PyTypeObject *)&SampleDType, NULL, NULL);
   if (new == NULL) {
     return NULL;
   }
 
-  // TODO: Pick correct element size and alignment
-  printf("TODO: %s\n", __func__);
   Py_INCREF(sample_scalar);
   new->sample_scalar = sample_scalar;
-  new->base.elsize = sizeof(ScalarElementType);
-  new->base.alignment = _Alignof(ScalarElementType);
+  new->base.elsize = elsize;
+  new->base.alignment = alignment;
 
   return new;
 }
@@ -45,7 +67,7 @@ static PyArray_Descr *sampledtype_discover_descriptor_from_pyobject(
     return NULL;
   }
 
-  SampleDTypeObject *new = NULL; // TODO: new_sampledtype_instance(...);
+  SampleDTypeObject *new = new_sampledtype_instance(obj);
   if (new == NULL) {
     return NULL;
   }
@@ -83,7 +105,8 @@ sampledtype_ensure_canonical(SampleDTypeObject *self) {
 
 static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
                                char *dataptr) {
-  printf("TODO: %s, target elsise %lld\n", __func__, descr->base.elsize);
+  printf("%s, target elsise %lld, type_num %d\n", __func__, descr->base.elsize,
+         descr->base.type_num);
 
   if (Py_TYPE(obj) != SampleScalar_Type) {
     PyErr_SetString(PyExc_TypeError,
@@ -91,21 +114,62 @@ static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
     return -1;
   }
 
-  // TODO: ...
-  npy_intp elsize = descr->base.elsize;
-  npy_intp alignment = descr->base.alignment;
+  PyObject *res =
+      PyObject_CallMethod(descr->sample_scalar, "is_compatible", "O", obj);
+  if (res == NULL) {
+    return -1;
+  }
+  int is_compatible = PyObject_IsTrue(res);
+  Py_DECREF(res);
 
-  PyErr_Format(PyExc_NotImplementedError, "TODO: %s", __func__);
+  if (!is_compatible) {
+    PyErr_Format(PyExc_ValueError, "Incompatible item value");
+    return -1;
+  }
 
-  return -1;
+  // Copy data-bytes from 'obj' into 'dataptr'
+  PyObject *ndarr_bytes = PyObject_GetAttrString(obj, "data_buffer");
+  if (ndarr_bytes == NULL) {
+    return -1;
+  }
+
+  const char *src_data = NULL;
+  Py_ssize_t data_size = 0;
+  if (PyBytes_AsStringAndSize(ndarr_bytes, &src_data, &data_size) != 0) {
+    Py_DECREF(ndarr_bytes);
+    return -1;
+  }
+
+  if (data_size != descr->base.elsize) {
+    Py_DECREF(ndarr_bytes);
+    PyErr_Format(PyExc_ValueError,
+                 "Unexpected item data buffer size: %zd / %zd", data_size,
+                 descr->base.elsize);
+    return -1;
+  }
+
+  memcpy(dataptr, src_data, data_size);
+  Py_DECREF(ndarr_bytes);
+
+  return 0;
 }
 
 static PyObject *sampledtype_getitem(SampleDTypeObject *descr, char *dataptr) {
-  printf("TODO: %s, source elsize %lld\n", __func__, descr->base.elsize);
+  printf("%s, source elsize %lld, type_num %d\n", __func__, descr->base.elsize,
+         descr->base.type_num);
 
-  PyErr_Format(PyExc_NotImplementedError, "TODO: %s", __func__);
+  // Pass data-bytes from 'dataptr' to 'obj'
+  PyObject *ndarr_bytes =
+      PyBytes_FromStringAndSize(dataptr, descr->base.elsize);
+  if (ndarr_bytes == NULL) {
+    return NULL;
+  }
 
-  return NULL;
+  PyObject *res = PyObject_CallMethod(descr->sample_scalar, "from_data_buffer",
+                                      "O", ndarr_bytes);
+  Py_DECREF(ndarr_bytes);
+
+  return res;
 }
 
 static PyType_Slot SampleDType_Slots[] = {
@@ -158,11 +222,12 @@ static void sampledtype_dealloc(PyObject *self) {
 }
 
 static PyObject *sampledtype_repr(SampleDTypeObject *self) {
-  printf("TODO: %s, sample_scalar type '%s'\n", __func__,
+  printf("%s, sample_scalar type '%s'\n", __func__,
          Py_TYPE(self->sample_scalar)->tp_name);
 
-  // TODO: Use '%R', self->obj
-  PyObject *res = PyUnicode_FromFormat("SampleDType(<TODO>)");
+  PyObject *res = PyUnicode_FromFormat(
+      "SampleDType(elsize=%zd, alignment=%ld, sample_scalar=%R)",
+      self->base.elsize, self->base.alignment, self->sample_scalar);
   return res;
 }
 

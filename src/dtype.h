@@ -13,9 +13,6 @@ typedef struct {
 extern PyArray_DTypeMeta SampleDType;
 extern PyTypeObject *SampleScalar_Type;
 
-// TODO: Pick the correct element based on ScalarType
-typedef long double ScalarElementType;
-
 int init_sample_dtype(void);
 
 #endif /*_NPY_DTYPE_H*/

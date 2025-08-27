@@ -103,6 +103,37 @@ sampledtype_ensure_canonical(SampleDTypeObject *self) {
   return self;
 }
 
+static PyObject *create_element_view(SampleDTypeObject *descr, char *dataptr,
+                                     npy_bool readonly) {
+  PyObject *ndarr_obj = PyObject_GetAttrString(descr->sample_scalar, "ndarr");
+  if (ndarr_obj == NULL) {
+    return NULL;
+  }
+  if (!PyArray_Check(ndarr_obj)) {
+    Py_DECREF(ndarr_obj);
+    PyErr_SetString(PyExc_TypeError,
+                    "SampleScalar.ndarr() must return NumPy array");
+    return NULL;
+  }
+
+  PyArrayObject *ndarr_arrobj = (PyArrayObject *)ndarr_obj;
+  PyArray_Descr *ndarr_descr = PyArray_DESCR(ndarr_arrobj);
+
+  PyObject *view = PyArray_NewFromDescr(
+      &PyArray_Type, ndarr_descr, PyArray_NDIM(ndarr_arrobj),
+      PyArray_DIMS(ndarr_arrobj), PyArray_STRIDES(ndarr_arrobj),
+      dataptr, // data pointer for the view
+      readonly ? 0 : NPY_ARRAY_WRITEABLE, NULL);
+  if (view != NULL) {
+    // Now 'view' owns the descriptor, it will be dereferenced when view is
+    // deallocated
+    Py_INCREF(ndarr_descr);
+  }
+
+  Py_DECREF(ndarr_obj);
+  return view;
+}
+
 static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
                                char *dataptr) {
   printf("%s, target elsise %lld, type_num %d\n", __func__, descr->base.elsize,
@@ -127,29 +158,17 @@ static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
     return -1;
   }
 
-  // Copy data-bytes from 'obj' into 'dataptr'
-  PyObject *ndarr_bytes = PyObject_GetAttrString(obj, "data_buffer");
-  if (ndarr_bytes == NULL) {
+  PyObject *view = create_element_view(descr, dataptr, NPY_FALSE);
+  if (view == NULL) {
     return -1;
   }
 
-  const char *src_data = NULL;
-  Py_ssize_t data_size = 0;
-  if (PyBytes_AsStringAndSize(ndarr_bytes, &src_data, &data_size) != 0) {
-    Py_DECREF(ndarr_bytes);
+  res = PyObject_CallMethod(obj, "setitem", "O", view);
+  Py_DECREF(view);
+  if (res == NULL) {
     return -1;
   }
-
-  if (data_size != descr->base.elsize) {
-    Py_DECREF(ndarr_bytes);
-    PyErr_Format(PyExc_ValueError,
-                 "Unexpected item data buffer size: %zd / %zd", data_size,
-                 descr->base.elsize);
-    return -1;
-  }
-
-  memcpy(dataptr, src_data, data_size);
-  Py_DECREF(ndarr_bytes);
+  Py_DECREF(res);
 
   return 0;
 }
@@ -158,16 +177,17 @@ static PyObject *sampledtype_getitem(SampleDTypeObject *descr, char *dataptr) {
   printf("%s, source elsize %lld, type_num %d\n", __func__, descr->base.elsize,
          descr->base.type_num);
 
-  // Pass data-bytes from 'dataptr' to 'obj'
-  PyObject *ndarr_bytes =
-      PyBytes_FromStringAndSize(dataptr, descr->base.elsize);
-  if (ndarr_bytes == NULL) {
+  PyObject *view = create_element_view(descr, dataptr, NPY_TRUE);
+  if (view == NULL) {
     return NULL;
   }
 
-  PyObject *res = PyObject_CallMethod(descr->sample_scalar, "from_data_buffer",
-                                      "O", ndarr_bytes);
-  Py_DECREF(ndarr_bytes);
+  PyObject *res =
+      PyObject_CallMethod(descr->sample_scalar, "getitem", "O", view);
+  Py_DECREF(view);
+  if (res == NULL) {
+    return NULL;
+  }
 
   return res;
 }

@@ -1,4 +1,4 @@
-"""Test basic module import"""
+"""Test DType creation/instantiation"""
 
 import numpy as np
 import pytest
@@ -31,12 +31,12 @@ def test_setitem():
   scalar = sample_dtypes.SampleScalar(dtype=int)
 
   print('  * set compatible value')
-  arr = np.empty(3, sample_dtypes.SampleDType(scalar))
+  arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar))
   scalar._ndarr.flat[...] = np.arange(scalar._ndarr.size) + 10
   arr[1] = scalar
   np.testing.assert_equal(arr[1]._ndarr, scalar._ndarr)
 
   print('  * set incompatible value')
-  arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType)
+  arr = np.empty(3, sample_dtypes.SampleDType)
   with pytest.raises(ValueError):
     arr[0] = scalar

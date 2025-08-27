@@ -37,15 +37,18 @@ class SampleScalar:
     return f'{type(self).__name__}(id={hex(id(self))}, shape={self._ndarr.shape}, dtype={self._ndarr.dtype})'
 
   @property
-  def data_buffer(self) -> bytes:
-    """Get raw-data"""
-    return self._ndarr.tobytes(order=BYTES_BUF_ORDER)
+  def ndarr(self) -> np.ndarray:
+    return self._ndarr
 
-  def from_data_buffer(self, buf: bytes) -> 'SampleScalar':
-    """Create new object using raw-data"""
-    assert (
-        len(buf) == self._ndarr.nbytes
-    ), f'Buffer size must be {self._ndarr.nbytes}'
+  def setitem(self, target: np.ndarray) -> None:
+    """Get raw-data"""
+    print(
+        f'TODO: setitem, taget: {type(target)}, {target.shape}, {target.dtype}'
+    )
+    target[...] = self._ndarr
+
+  def getitem(self, source: np.ndarray) -> 'SampleScalar':
+    """Store raw-data into a new object"""
     new = self.copy()
-    new._ndarr.flat[:] = np.frombuffer(buf, dtype=self._ndarr.dtype)
+    new._ndarr.flat[:] = source
     return new

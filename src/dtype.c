@@ -103,37 +103,6 @@ sampledtype_ensure_canonical(SampleDTypeObject *self) {
   return self;
 }
 
-static PyObject *create_element_view(SampleDTypeObject *descr, char *dataptr,
-                                     npy_bool readonly) {
-  PyObject *ndarr_obj = PyObject_GetAttrString(descr->sample_scalar, "ndarr");
-  if (ndarr_obj == NULL) {
-    return NULL;
-  }
-  if (!PyArray_Check(ndarr_obj)) {
-    Py_DECREF(ndarr_obj);
-    PyErr_SetString(PyExc_TypeError,
-                    "SampleScalar.ndarr() must return NumPy array");
-    return NULL;
-  }
-
-  PyArrayObject *ndarr_arrobj = (PyArrayObject *)ndarr_obj;
-  PyArray_Descr *ndarr_descr = PyArray_DESCR(ndarr_arrobj);
-
-  PyObject *view = PyArray_NewFromDescr(
-      &PyArray_Type, ndarr_descr, PyArray_NDIM(ndarr_arrobj),
-      PyArray_DIMS(ndarr_arrobj), PyArray_STRIDES(ndarr_arrobj),
-      dataptr, // data pointer for the view
-      readonly ? 0 : NPY_ARRAY_WRITEABLE, NULL);
-  if (view != NULL) {
-    // Now 'view' owns the descriptor, it will be dereferenced when view is
-    // deallocated
-    Py_INCREF(ndarr_descr);
-  }
-
-  Py_DECREF(ndarr_obj);
-  return view;
-}
-
 static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
                                char *dataptr) {
   printf("%s, target elsise %lld, type_num %d\n", __func__, descr->base.elsize,
@@ -145,26 +114,8 @@ static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
     return -1;
   }
 
-  PyObject *res =
-      PyObject_CallMethod(descr->sample_scalar, "is_compatible", "O", obj);
-  if (res == NULL) {
-    return -1;
-  }
-  int is_compatible = PyObject_IsTrue(res);
-  Py_DECREF(res);
-
-  if (!is_compatible) {
-    PyErr_Format(PyExc_ValueError, "Incompatible item value");
-    return -1;
-  }
-
-  PyObject *view = create_element_view(descr, dataptr, NPY_FALSE);
-  if (view == NULL) {
-    return -1;
-  }
-
-  res = PyObject_CallMethod(obj, "setitem", "O", view);
-  Py_DECREF(view);
+  PyObject *res = PyObject_CallMethod(descr->sample_scalar, "setitem", "On",
+                                      obj, (Py_ssize_t)dataptr);
   if (res == NULL) {
     return -1;
   }
@@ -177,19 +128,8 @@ static PyObject *sampledtype_getitem(SampleDTypeObject *descr, char *dataptr) {
   printf("%s, source elsize %lld, type_num %d\n", __func__, descr->base.elsize,
          descr->base.type_num);
 
-  PyObject *view = create_element_view(descr, dataptr, NPY_TRUE);
-  if (view == NULL) {
-    return NULL;
-  }
-
-  PyObject *res =
-      PyObject_CallMethod(descr->sample_scalar, "getitem", "O", view);
-  Py_DECREF(view);
-  if (res == NULL) {
-    return NULL;
-  }
-
-  return res;
+  return PyObject_CallMethod(descr->sample_scalar, "getitem", "n",
+                             (Py_ssize_t)dataptr);
 }
 
 static PyType_Slot SampleDType_Slots[] = {

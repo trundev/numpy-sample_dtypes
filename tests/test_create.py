@@ -28,7 +28,7 @@ def test_setitem():
   import sample_dtypes
 
   print('* create empty array')
-  scalar = sample_dtypes.SampleScalar(dtype=int)
+  scalar = sample_dtypes.SampleScalar(shape=(3,), dtype=int)
 
   print('  * set compatible value')
   arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar))

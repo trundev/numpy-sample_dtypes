@@ -39,6 +39,16 @@ SampleDTypeObject *new_sampledtype_instance(PyObject *sample_scalar) {
     return NULL;
   }
 
+  attr = PyObject_GetAttrString(sample_scalar, "hasobject");
+  if (attr == NULL) {
+    return NULL;
+  }
+  int hasobject = PyObject_IsTrue(attr);
+  Py_DECREF(attr);
+  if (hasobject == -1 && PyErr_Occurred()) {
+    return NULL;
+  }
+
   // Allocate final DType bject
   SampleDTypeObject *new = (SampleDTypeObject *)PyArrayDescr_Type.tp_new(
       (PyTypeObject *)&SampleDType, NULL, NULL);
@@ -48,6 +58,10 @@ SampleDTypeObject *new_sampledtype_instance(PyObject *sample_scalar) {
 
   Py_INCREF(sample_scalar);
   new->sample_scalar = sample_scalar;
+  if (hasobject) {
+    // TODO: Other flags from NPY_OBJECT_DTYPE_FLAGS
+    new->base.flags |= NPY_ITEM_HASOBJECT | NPY_NEEDS_INIT;
+  }
   new->base.elsize = elsize;
   new->base.alignment = alignment;
 
@@ -105,7 +119,7 @@ sampledtype_ensure_canonical(SampleDTypeObject *self) {
 
 static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
                                char *dataptr) {
-  printf("%s, target elsise %lld, type_num %d\n", __func__, descr->base.elsize,
+  printf("%s, target elsise %zd, type_num %d\n", __func__, descr->base.elsize,
          descr->base.type_num);
 
   if (Py_TYPE(obj) != SampleScalar_Type) {
@@ -125,11 +139,49 @@ static int sampledtype_setitem(SampleDTypeObject *descr, PyObject *obj,
 }
 
 static PyObject *sampledtype_getitem(SampleDTypeObject *descr, char *dataptr) {
-  printf("%s, source elsize %lld, type_num %d\n", __func__, descr->base.elsize,
+  printf("%s, source elsize %zd, type_num %d\n", __func__, descr->base.elsize,
          descr->base.type_num);
 
   return PyObject_CallMethod(descr->sample_scalar, "getitem", "n",
                              (Py_ssize_t)dataptr);
+}
+
+static int sampledtype_clear_loop(void *NPY_UNUSED(traverse_context),
+                                  const PyArray_Descr *_descr, char *data,
+                                  npy_intp size, npy_intp stride,
+                                  NpyAuxData *NPY_UNUSED(auxdata)) {
+  const SampleDTypeObject *descr = (const SampleDTypeObject *)_descr;
+  printf("%s, source elsize %zd, type_num %d, data %p, size %zd, stride %zd\n",
+         __func__, descr->base.elsize, descr->base.type_num, data, size,
+         stride);
+
+  PyObject *res = PyObject_CallMethod(descr->sample_scalar, "clear_loop", "nnn",
+                                      (Py_ssize_t)data, size, stride);
+  if (res == NULL) {
+    return -1;
+  }
+  int ret = PyLong_AsLong(res);
+  Py_DECREF(res);
+  if (ret == -1 && PyErr_Occurred()) {
+    return -1;
+  }
+
+  return ret;
+}
+
+static int sampledtype_get_clear_loop(void *NPY_UNUSED(traverse_context),
+                                      const SampleDTypeObject *descr,
+                                      int aligned, npy_intp fixed_stride,
+                                      PyArrayMethod_TraverseLoop **out_loop,
+                                      NpyAuxData **NPY_UNUSED(out_auxdata),
+                                      NPY_ARRAYMETHOD_FLAGS *flags) {
+  printf("%s, source elsize %zd, type_num %d, aligned %d, fixed_stride %zd\n",
+         __func__, descr->base.elsize, descr->base.type_num, aligned,
+         fixed_stride);
+
+  *out_loop = &sampledtype_clear_loop;
+  *flags = NPY_METH_NO_FLOATINGPOINT_ERRORS;
+  return 0;
 }
 
 static PyType_Slot SampleDType_Slots[] = {
@@ -140,6 +192,7 @@ static PyType_Slot SampleDType_Slots[] = {
     {NPY_DT_ensure_canonical, &sampledtype_ensure_canonical},
     {NPY_DT_setitem, &sampledtype_setitem},
     {NPY_DT_getitem, &sampledtype_getitem},
+    {NPY_DT_get_clear_loop, &sampledtype_get_clear_loop},
     {0, NULL}};
 
 static PyObject *sampledtype_new(PyTypeObject *NPY_UNUSED(cls), PyObject *args,

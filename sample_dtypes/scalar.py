@@ -130,3 +130,22 @@ class SampleScalar:
     view = self._get_strided_np_view(data, size, stride)
     view[...] = 0  # Force dereference of all object-entries
     return 0
+
+  def cast_loop(
+      self,
+      other: 'SampleScalar',
+      data: tuple[int, int],
+      dimensions: tuple[int],
+      strides: tuple[int, int],
+  ) -> int:
+    """Python implementation for `NPY_METH_unaligned_strided_loop` callback
+
+    NOTE: See setitem()
+    """
+    print(
+        f'scalar.py: SampleScalar.cast_loop {other=}, {data=}, {dimensions=}, {strides=}'
+    )
+    in_view = other._get_strided_np_view(data[0], dimensions[0], strides[0])
+    out_view = self._get_strided_np_view(data[1], dimensions[0], strides[1])
+    out_view[...] = in_view
+    return 0

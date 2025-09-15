@@ -15,12 +15,12 @@ def test_instantiate():
   print('* string arg')
   with pytest.raises(TypeError):
     print('  *', sample_dtypes.SampleDType('123'))
-  print('* string SampleScalar class')
+  print('* ScalarType class')
   with pytest.raises(TypeError):
-    print('  *', sample_dtypes.SampleDType(sample_dtypes.SampleScalar))
+    print('  *', sample_dtypes.SampleDType(sample_dtypes.ScalarType))
 
-  print('* string SampleScalar object')
-  print('  *', sample_dtypes.SampleDType(sample_dtypes.SampleScalar()))
+  print('* ScalarType object')
+  print('  *', sample_dtypes.SampleDType(sample_dtypes.ScalarType()))
 
 
 def test_setitem():
@@ -28,7 +28,7 @@ def test_setitem():
   import sample_dtypes
 
   print('* create empty array')
-  scalar = sample_dtypes.SampleScalar(shape=(3,), dtype=int)
+  scalar = sample_dtypes.scalar.Scalar(shape=(3,), dtype=int)
 
   print('  * set compatible value')
   arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar))

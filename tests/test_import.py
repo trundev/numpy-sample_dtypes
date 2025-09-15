@@ -13,7 +13,7 @@ def test_import():
 
 def test_import_ext():
   """Test importing of the extension module"""
-  from sample_dtypes import _sample_dtypes_main as pyd
+  from sample_dtypes import _dtypes_ext as pyd
 
-  print(f'sample_dtypes._sample_dtypes_main ({pyd.__name__}):')
+  print(f'sample_dtypes._dtypes_ext ({pyd.__name__}):')
   print('*', pyd.__file__)

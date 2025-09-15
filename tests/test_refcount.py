@@ -19,7 +19,7 @@ def test_dtype_refcnt():
       sys.getrefcount(dtype) == 2
   ), 'Unexpected initial ref-count for non-immortal object'
 
-  scalar = sample_dtypes.SampleScalar(dtype=dtype)
+  scalar = sample_dtypes.scalar.Scalar(dtype=dtype)
   arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar))
   arr[1] = scalar
 
@@ -71,8 +71,9 @@ def test_custom_as_ctypes_type(dtype):
 def test_sub_dtype_refcnt():
   """Test SampleScalar internal dtype reference counts"""
   # Use generic-object dtype to test sub-object ownership transfer
-  scalar = sample_dtypes.SampleScalar(dtype=object)
-  arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar.copy()))
+  scalar = sample_dtypes.ScalarType(shape=(2, 2), dtype=object)
+  arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(scalar))
+  scalar = scalar._create()
 
   obj = f'string {1}'  # Dynamic (non-immortal) string object
   scalar._ndarr[0, 1] = obj

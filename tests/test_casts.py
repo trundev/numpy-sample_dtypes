@@ -8,7 +8,7 @@ import sample_dtypes
 
 def test_sample_to_sample():
   """Same type cast (copy operation)"""
-  scalar = sample_dtypes.SampleScalar(dtype=np.uint16)
+  scalar = sample_dtypes.scalar.Scalar(shape=(5,), dtype=np.uint16)
   src_arr: np.ndarray = np.empty((3, 4), sample_dtypes.SampleDType(scalar))
   dst_arr: np.ndarray = np.empty_like(src_arr)
   test_data = np.arange(scalar._ndarr.size) + 10
@@ -39,17 +39,18 @@ def test_sample_to_sample():
     'in_dtype, out_dtype',
     itertools.permutations([np.uint8, np.float32, object], 2),
 )
-def test_covert_internal_dtype(in_dtype: np.dtype, out_dtype: np.dtype):
+def test_convert_internal_dtype(in_dtype: np.dtype, out_dtype: np.dtype):
   """Same type cast between different scalar-internal dtypes"""
-  in_scalar = sample_dtypes.SampleScalar(dtype=in_dtype)
+  in_scalar = sample_dtypes.ScalarType(shape=(2, 2), dtype=in_dtype)
   in_arr: np.ndarray = np.empty(3, sample_dtypes.SampleDType(in_scalar))
   out_arr: np.ndarray = np.empty_like(
       in_arr,
       dtype=sample_dtypes.SampleDType(
-          sample_dtypes.SampleScalar(dtype=out_dtype)
+          sample_dtypes.ScalarType(shape=(2, 2), dtype=out_dtype)
       ),
   )
 
+  in_scalar = in_scalar._create()
   in_scalar._ndarr.flat[...] = np.arange(in_scalar._ndarr.size) * 5 + 3
   in_arr.flat[...] = in_scalar
   out_arr = in_arr

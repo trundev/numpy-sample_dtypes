@@ -13,10 +13,18 @@ incdir_numpy = run_command(py,
   ],
   check: true
 ).stdout().strip()
+incdir_pybind11 = run_command(py,
+  [
+    '-c',
+    'import pybind11; print(pybind11.get_include())'
+  ],
+  check: true
+).stdout().strip()
 
 includes = include_directories(
   [
     incdir_numpy,
+    incdir_pybind11,
     'src'
   ]
 )
@@ -27,13 +35,17 @@ c_args = [
   '-DNPY_NO_DEPRECATED_API=NPY_2_0_API_VERSION',
   '-DNPY_TARGET_VERSION=NPY_2_0_API_VERSION',
 ]
+if get_option('buildtype') == 'debug'
+  # Avoid '_DEBUG' as it links to 'python*_d.lib'
+  c_args += ['-D__DEBUG']
+endif
 
 srcs = [
   'src/casts.cpp',
   'src/casts.h',
-  'src/dtype.c',
+  'src/dtype.cpp',
   'src/dtype.h',
-  'src/main.c',
+  'src/main.cpp',
 ]
 
 py.install_sources(
@@ -46,7 +58,7 @@ py.install_sources(
 )
 
 py.extension_module(
-  '_sample_dtypes_main',
+  '_dtypes_ext',
   srcs,
   install: true,
   subdir: 'sample_dtypes',

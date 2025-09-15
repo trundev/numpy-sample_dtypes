@@ -30,6 +30,7 @@ dev = [
 requires = [
     "meson",
     "meson-python",
+    "pybind11",
     "wheel",
     "numpy",
 ]

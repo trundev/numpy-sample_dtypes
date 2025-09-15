@@ -2,42 +2,18 @@
 
 #define NO_IMPORT_ARRAY
 #define NO_IMPORT_UFUNC
-
-extern "C" {
 #include "numpy/arrayobject.h"
 #include "numpy/dtype_api.h"
 #include "numpy/ndarraytypes.h"
-}
 
 #include "casts.h"
 #include "dtype.h"
-#include "vector"
-
-#if 1 //_DEBUG only
-#include <stdarg.h>
-static void print_fromformat(const char *func, const char *format, ...) {
-  va_list vargs;
-  va_start(vargs, format);
-
-  PyObject *str_obj = PyUnicode_FromFormatV(format, vargs);
-  if (str_obj != NULL) {
-    printf("%s: %s", func, PyUnicode_AsUTF8(str_obj));
-    Py_DECREF(str_obj);
-  }
-
-  va_end(vargs);
-}
-#define PRINT_FROMFORMAT(fmt, ...) print_fromformat(__func__, fmt, __VA_ARGS__)
-#else
-#define PRINT_FROMFORMAT(...)
-#endif
 
 static NPY_CASTING sample_to_sample_resolve_descriptors(
     PyObject *NPY_UNUSED(self), PyArray_DTypeMeta *NPY_UNUSED(dtypes[2]),
     PyArray_Descr *given_descrs[2], PyArray_Descr *loop_descrs[2],
     npy_intp *view_offset) {
-  printf("TODO: %s, given_descrs=[%p, %p]\n", __func__, given_descrs[0],
-         given_descrs[1]);
+  py::print(__func__);
 
   if (given_descrs[0] == NULL) {
     return _NPY_ERROR_OCCURRED_IN_CAST;
@@ -45,19 +21,23 @@ static NPY_CASTING sample_to_sample_resolve_descriptors(
     Py_INCREF(given_descrs[0]);
     loop_descrs[1] = given_descrs[0];
   } else {
-    SampleDTypeObject *descr_in = (SampleDTypeObject *)given_descrs[0];
-    SampleDTypeObject *descr_out = (SampleDTypeObject *)given_descrs[1];
-    PRINT_FROMFORMAT("descr_in scalar=%R, descr_out scalar=%R\n",
-                     descr_in->sample_scalar, descr_out->sample_scalar);
+    auto descr_in = reinterpret_cast<SampleDTypeObject *>(given_descrs[0]);
+    auto descr_out = reinterpret_cast<SampleDTypeObject *>(given_descrs[1]);
+#if __DEBUG
+    py::print("  descr_in", descr_in->py_scalar, ", descr_out",
+              descr_out->py_scalar);
+#endif
 
-    PyObject *res =
-        PyObject_CallMethod(descr_out->sample_scalar, "is_compatible", "O",
-                            descr_in->sample_scalar);
-    if (res == NULL) {
+    bool is_compatible;
+    try {
+      is_compatible =
+          descr_out->py_scalar.attr("is_compatible")(descr_in->py_scalar)
+              .cast<bool>();
+    } catch (const py::error_already_set &e) {
+      // Handle exceptions from Python
+      PyErr_SetObject(e.type().ptr(), e.value().ptr());
       return _NPY_ERROR_OCCURRED_IN_CAST;
     }
-    int is_compatible = PyObject_IsTrue(res);
-    Py_DECREF(res);
     if (!is_compatible) {
       return NPY_UNSAFE_CASTING;
     }
@@ -78,36 +58,36 @@ static int sample_to_sample_loop(PyArrayMethod_Context *context,
                                  npy_intp const dimensions[],
                                  npy_intp const strides[],
                                  void *NPY_UNUSED(auxdata)) {
-  SampleDTypeObject *descr_in = (SampleDTypeObject *)context->descriptors[0];
-  SampleDTypeObject *descr_out = (SampleDTypeObject *)context->descriptors[1];
-  PRINT_FROMFORMAT("descr_in scalar=%R, descr_out scalar=%R\n",
-                   descr_in->sample_scalar, descr_out->sample_scalar);
+  auto descr_in =
+      reinterpret_cast<SampleDTypeObject *>(context->descriptors[0]);
+  auto descr_out =
+      reinterpret_cast<SampleDTypeObject *>(context->descriptors[1]);
+#if __DEBUG
+  py::print(__func__, "descr_in", descr_in->py_scalar, ", descr_out",
+            descr_out->py_scalar);
+#endif
 
-  PyObject *res = PyObject_CallMethod(
-      descr_out->sample_scalar, "cast_loop", "O (n,n) (n) (n,n)",
-      // `in` scalar object
-      descr_in->sample_scalar,
-      // tuple of `in` and `out` data addresses
-      (Py_ssize_t)data[0], (Py_ssize_t)data[1],
-      // tuple of single N element
-      (Py_ssize_t)dimensions[0],
-      // tuple of `in` and `out` strides
-      (Py_ssize_t)strides[0], (Py_ssize_t)strides[1]);
-  if (res == NULL) {
+  int ret;
+  try {
+    ret = descr_out->py_scalar
+              .attr("cast_loop")(
+                  // `in` scalar object
+                  descr_in->py_scalar,
+                  // tuple of `in` and `out` data addresses
+                  py::make_tuple((Py_ssize_t)data[0], (Py_ssize_t)data[1]),
+                  // tuple of single N element
+                  py::make_tuple(dimensions[0]),
+                  // tuple of `in` and `out` strides
+                  py::make_tuple(strides[0], strides[1]))
+              .cast<int>();
+  } catch (const py::error_already_set &e) {
+    // Handle exceptions from Python
+    PyErr_SetObject(e.type().ptr(), e.value().ptr());
     return -1;
   }
-  int ret = PyLong_AsLong(res);
-  Py_DECREF(res);
-  if (ret == -1 && PyErr_Occurred()) {
-    return -1;
-  }
-
   return ret;
 }
 
-/*
- * NumPy currently allows NULL for the own DType/"cls".
- */
 static PyArray_DTypeMeta *s2s_dtypes[] = {nullptr, nullptr};
 
 static PyType_Slot s2s_slots[] = {
@@ -118,17 +98,8 @@ static PyType_Slot s2s_slots[] = {
     {NPY_METH_unaligned_strided_loop, (void *)&sample_to_sample_loop},
     {0, nullptr}};
 
-PyArrayMethod_Spec SampleToFloat64CastSpec = {
-    // TODO: See
-    // https://github.com/numpy/numpy-user-dtypes/blob/1111a86b99ce12633cf8eac8795d4ddafd45541a/unytdtype/unytdtype/src/casts.c#L475C25-L475C46
-};
-
-static std::vector<PyArrayMethod_Spec *> specs;
-
-PyArrayMethod_Spec **init_casts_internal(void) {
-  // TODO: ....
-  printf("TODO: %s\n", __func__);
-
+PyArrayMethod_Spec **dtype_casts::init(py::object scalar_type) {
+  // Add sample-to-sample cast
   specs.push_back(new PyArrayMethod_Spec{
       .name = "cast_SampleDType_to_SampleDType",
       .nin = 1,
@@ -142,18 +113,9 @@ PyArrayMethod_Spec **init_casts_internal(void) {
   // Finally NULL terminator
   specs.push_back(nullptr);
   return specs.data();
-}
+};
 
-PyArrayMethod_Spec **init_casts(void) {
-  try {
-    return init_casts_internal();
-  } catch (int e) {
-    PyErr_NoMemory();
-    return nullptr;
-  }
-}
-
-void free_casts(void) {
+dtype_casts::~dtype_casts() {
   for (auto spec : specs) {
     if (spec) { /*All the specs, dtypes and slots are currently static
        delete[] spec->dtypes;
